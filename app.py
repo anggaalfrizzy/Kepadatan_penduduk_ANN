@@ -170,3 +170,4 @@ if __name__ == '__main__':
         print(f"✅ Data loaded: {len(kabupaten_list)} kabupaten/kota")
 
     app.run(debug=True, port=5000)
+    

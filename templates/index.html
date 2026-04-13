@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuralDensity — Prediksi Kepadatan Penduduk Jawa Barat</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #070b12;
+    --surface: #0d1420;
+    --surface2: #111927;
+    --border: #1e2d42;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --accent3: #f59e0b;
+    --text: #e2eaf5;
+    --text-muted: #5a7a9a;
+    --success: #10b981;
+    --danger: #ef4444;
+    --glow: 0 0 30px rgba(0,229,255,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ANIMATED GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* NAVBAR */
+  .navbar-custom {
+    background: rgba(7,11,18,0.92);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .navbar-brand-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem;
+    color: var(--accent) !important;
+    letter-spacing: 2px;
+  }
+  .navbar-brand-text span { color: var(--text-muted); }
+  .nav-badge {
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    color: white;
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  /* HERO */
+  .hero-section {
+    position: relative;
+    z-index: 1;
+    padding: 5rem 0 3rem;
+    text-align: center;
+    overflow: hidden;
+  }
+  .hero-section::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .hero-eyebrow::before, .hero-eyebrow::after {
+    content: '';
+    height: 1px;
+    width: 40px;
+    background: var(--accent);
+    opacity: 0.4;
+  }
+  .hero-title {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #ffffff 30%, var(--accent) 70%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 1.2rem;
+  }
+  .hero-sub {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    max-width: 520px;
+    margin: 0 auto 2.5rem;
+    line-height: 1.7;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+  }
+
+  /* STAT CARDS ROW */
+  .stat-row {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+  .stat-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    padding: 0.5rem 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    transition: all 0.3s;
+  }
+  .stat-pill:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px rgba(0,229,255,0.1);
+  }
+  .stat-pill .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+  .stat-pill .val {
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+  }
+  .stat-pill .lbl { color: var(--text-muted); }
+
+  /* MAIN CONTENT */
+  .main-wrap {
+    position: relative;
+    z-index: 1;
+    padding: 0 0 4rem;
+  }
+
+  /* CARDS */
+  .card-neo {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.75rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .card-neo:hover {
+    border-color: rgba(0,229,255,0.25);
+    box-shadow: var(--glow);
+  }
+  .card-header-neo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1.4rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+  }
+  .card-icon.cyan { background: rgba(0,229,255,0.1); color: var(--accent); }
+  .card-icon.purple { background: rgba(124,58,237,0.15); color: #a78bfa; }
+  .card-icon.amber { background: rgba(245,158,11,0.1); color: var(--accent3); }
+  .card-icon.green { background: rgba(16,185,129,0.1); color: var(--success); }
+
+  .card-title-neo {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.5px;
+  }
+  .card-subtitle-neo {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* FORM CONTROLS */
+  .form-label-neo {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+  .form-control-neo, .form-select-neo {
+    background: var(--bg) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    border-radius: 10px !important;
+    padding: 0.65rem 1rem !important;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.85rem !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+    width: 100%;
+  }
+  .form-control-neo:focus, .form-select-neo:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.1) !important;
+    outline: none !important;
+  }
+  select.form-select-neo option {
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  /* BUTTONS */
+  .btn-neo-primary {
+    background: linear-gradient(135deg, var(--accent2) 0%, var(--accent) 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.7rem 1.5rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+  }
+  .btn-neo-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,229,255,0.3);
+  }
+  .btn-neo-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .btn-neo-secondary {
+    background: var(--surface2);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 0.7rem 1.5rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+  }
+  .btn-neo-secondary:hover {
+    background: rgba(0,229,255,0.08);
+    box-shadow: 0 0 20px rgba(0,229,255,0.15);
+  }
+
+  /* UPLOAD ZONE */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: rgba(0,229,255,0.02);
+    margin-bottom: 1rem;
+  }
+  .upload-zone:hover {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+  .upload-zone input { display: none; }
+  .upload-icon {
+    font-size: 2rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+  .upload-text {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-family: 'Space Mono', monospace;
+  }
+  .upload-text strong { color: var(--accent); }
+
+  /* STEP INDICATOR */
+  .steps-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 2rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+  .step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 80px;
+  }
+  .step-num {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    border: 2px solid var(--border);
+    color: var(--text-muted);
+    background: var(--surface2);
+    transition: all 0.4s;
+    position: relative;
+    z-index: 1;
+  }
+  .step-item.active .step-num {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.1);
+    box-shadow: 0 0 15px rgba(0,229,255,0.3);
+  }
+  .step-item.done .step-num {
+    border-color: var(--success);
+    color: white;
+    background: var(--success);
+  }
+  .step-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 5px;
+    text-align: center;
+    font-family: 'Space Mono', monospace;
+    white-space: nowrap;
+  }
+  .step-item.active .step-label, .step-item.done .step-label {
+    color: var(--text);
+  }
+  .step-connector {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    margin-bottom: 20px;
+    min-width: 20px;
+  }
+  .step-connector.done { background: var(--success); }
+
+  /* ALERT NEO */
+  .alert-neo {
+    border-radius: 10px;
+    padding: 0.85rem 1.1rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+    border: 1px solid;
+  }
+  .alert-neo.success {
+    background: rgba(16,185,129,0.08);
+    border-color: rgba(16,185,129,0.3);
+    color: var(--success);
+  }
+  .alert-neo.error {
+    background: rgba(239,68,68,0.08);
+    border-color: rgba(239,68,68,0.3);
+    color: var(--danger);
+  }
+  .alert-neo.info {
+    background: rgba(0,229,255,0.06);
+    border-color: rgba(0,229,255,0.2);
+    color: var(--accent);
+  }
+  .alert-neo.warning {
+    background: rgba(245,158,11,0.08);
+    border-color: rgba(245,158,11,0.25);
+    color: var(--accent3);
+  }
+
+  /* METRIC CARDS */
+  .metric-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    text-align: center;
+  }
+  .metric-val {
+    font-size: 1.6rem;
+    font-weight: 800;
+    font-family: 'Space Mono', monospace;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+  .metric-lbl {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  /* PREDICTION TABLE */
+  .pred-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 6px;
+  }
+  .pred-table thead th {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    padding: 0.5rem 1rem;
+  }
+  .pred-table tbody tr td {
+    background: var(--surface2);
+    padding: 0.75rem 1rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+  }
+  .pred-table tbody tr td:first-child {
+    border-radius: 8px 0 0 8px;
+    color: var(--text-muted);
+  }
+  .pred-table tbody tr td:last-child {
+    border-radius: 0 8px 8px 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .pred-table tbody tr:hover td {
+    background: rgba(0,229,255,0.05);
+  }
+
+  /* CHART WRAPPER */
+  .chart-wrap {
+    position: relative;
+    height: 280px;
+    width: 100%;
+  }
+
+  /* LOADER */
+  .loader-spin {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* CODE BLOCK */
+  .code-block {
+    background: #000d1a;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    color: #7fdbff;
+    overflow-x: auto;
+    line-height: 1.7;
+  }
+  .code-block .kw { color: #c792ea; }
+  .code-block .fn { color: #82aaff; }
+  .code-block .str { color: #c3e88d; }
+  .code-block .cm { color: var(--text-muted); }
+  .code-block .num { color: #f78c6c; }
+
+  /* FOOTER */
+  .footer-neo {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 0;
+    text-align: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  .footer-neo span { color: var(--accent); }
+
+  /* SECTION DIVIDER */
+  .section-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent2);
+    background: rgba(124,58,237,0.1);
+    border: 1px solid rgba(124,58,237,0.3);
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+  }
+
+  /* TOGGLE AREA */
+  .tutorial-collapse {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .tutorial-toggle {
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--text);
+    padding: 0.9rem 1.2rem;
+    text-align: left;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+  }
+  .tutorial-toggle:hover { background: rgba(0,229,255,0.04); }
+  .tutorial-body {
+    padding: 0 1.2rem 1.2rem;
+    display: none;
+  }
+  .tutorial-body.open { display: block; }
+
+  /* SCROLL REVEAL */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* DATA TABLE PREVIEW */
+  .data-preview {
+    overflow-x: auto;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .data-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+  }
+  .data-preview th {
+    background: var(--bg);
+    color: var(--accent);
+    padding: 0.5rem 0.8rem;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .data-preview td {
+    color: var(--text-muted);
+    padding: 0.4rem 0.8rem;
+    border-bottom: 1px solid rgba(30,45,66,0.5);
+  }
+  .data-preview tr:hover td { color: var(--text); }
+
+  @media (max-width: 768px) {
+    .hero-title { font-size: 2.2rem; }
+    .steps-flow { gap: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar-custom">
+  <div class="container-fluid d-flex align-items-center justify-content-between">
+    <a class="navbar-brand-text text-decoration-none d-flex align-items-center gap-2">
+      <i class="bi bi-cpu-fill" style="color:var(--accent)"></i>
+      NEURAL<span>/</span>DENSITY
+    </a>
+    <div class="d-flex align-items-center gap-3">
+      <span class="nav-badge">ANN v1.0</span>
+      <span style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
+        <i class="bi bi-geo-alt-fill" style="color:var(--accent)"></i> Jawa Barat
+      </span>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero-section">
+  <div class="container">
+    <div class="hero-eyebrow">Artificial Neural Network</div>
+    <h1 class="hero-title">Prediksi Kepadatan<br>Penduduk Jabar</h1>
+    <p class="hero-sub">
+      Model ANN berbasis TensorFlow/Keras untuk memprediksi<br>
+      kepadatan penduduk di 27 Kabupaten/Kota Jawa Barat
+    </p>
+    <div class="stat-row" id="heroStats">
+      <div class="stat-pill"><div class="dot"></div><span class="val" id="statKabupaten">—</span><span class="lbl">Kabupaten/Kota</span></div>
+      <div class="stat-pill"><div class="dot" style="background:var(--accent2)"></div><span class="val" id="statTahun">—</span><span class="lbl">Rentang Tahun</span></div>
+      <div class="stat-pill"><div class="dot" style="background:var(--accent3)"></div><span class="val" id="statRows">—</span><span class="lbl">Total Data</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN -->
+<main class="main-wrap">
+  <div class="container">
+
+    <!-- STEP INDICATOR -->
+    <div class="steps-flow mb-4" id="stepsFlow">
+      <div class="step-item active" id="step1">
+        <div class="step-num">01</div>
+        <div class="step-label">Upload Data</div>
+      </div>
+      <div class="step-connector" id="conn1"></div>
+      <div class="step-item" id="step2">
+        <div class="step-num">02</div>
+        <div class="step-label">Pilih Daerah</div>
+      </div>
+      <div class="step-connector" id="conn2"></div>
+      <div class="step-item" id="step3">
+        <div class="step-num">03</div>
+        <div class="step-label">Train ANN</div>
+      </div>
+      <div class="step-connector" id="conn3"></div>
+      <div class="step-item" id="step4">
+        <div class="step-num">04</div>
+        <div class="step-label">Prediksi</div>
+      </div>
+      <div class="step-connector" id="conn4"></div>
+      <div class="step-item" id="step5">
+        <div class="step-num">05</div>
+        <div class="step-label">Hasil</div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+
+      <!-- LEFT PANEL -->
+      <div class="col-lg-4">
+
+        <!-- STEP 1: Upload Data -->
+        <div class="card-neo reveal mb-4" id="panelUpload">
+          <div class="card-header-neo">
+            <div class="card-icon cyan"><i class="bi bi-cloud-upload-fill"></i></div>
+            <div>
+              <div class="card-title-neo">Step 1 — Upload Dataset</div>
+              <div class="card-subtitle-neo">CSV dari OpenData Jabar</div>
+            </div>
+          </div>
+
+          <label class="upload-zone" for="fileInput">
+            <input type="file" id="fileInput" accept=".csv">
+            <div class="upload-icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+            <div class="upload-text">
+              <strong>Klik untuk upload CSV</strong><br>
+              atau gunakan dataset default
+            </div>
+          </label>
+
+          <div id="uploadStatus"></div>
+
+          <button class="btn-neo-primary" id="btnLoad">
+            <i class="bi bi-lightning-fill"></i> Load Dataset
+          </button>
+        </div>
+
+        <!-- STEP 2: Pilih Kabupaten -->
+        <div class="card-neo reveal mb-4" id="panelSelect" style="opacity:0.5;pointer-events:none;">
+          <div class="card-header-neo">
+            <div class="card-icon purple"><i class="bi bi-map-fill"></i></div>
+            <div>
+              <div class="card-title-neo">Step 2 — Pilih Daerah</div>
+              <div class="card-subtitle-neo">Kabupaten/Kota target</div>
+            </div>
+          </div>
+
+          <label class="form-label-neo">Kabupaten / Kota</label>
+          <select class="form-select-neo" id="selectKabupaten">
+            <option value="">-- Pilih Daerah --</option>
+          </select>
+        </div>
+
+        <!-- STEP 3: Train Model -->
+        <div class="card-neo reveal mb-4" id="panelTrain" style="opacity:0.5;pointer-events:none;">
+          <div class="card-header-neo">
+            <div class="card-icon amber"><i class="bi bi-gear-wide-connected"></i></div>
+            <div>
+              <div class="card-title-neo">Step 3 — Training ANN</div>
+              <div class="card-subtitle-neo">200 epoch · Adam optimizer</div>
+            </div>
+          </div>
+
+          <div class="alert-neo info mb-3" style="font-size:0.72rem">
+            <i class="bi bi-info-circle-fill"></i>
+            Model: 2 hidden layer (10 neuron), ReLU, MSE loss
+          </div>
+
+          <button class="btn-neo-primary" id="btnTrain">
+            <i class="bi bi-play-fill"></i> Mulai Training
+          </button>
+
+          <div id="trainStatus" class="mt-3"></div>
+        </div>
+
+        <!-- STEP 4: Prediksi -->
+        <div class="card-neo reveal" id="panelPredict" style="opacity:0.5;pointer-events:none;">
+          <div class="card-header-neo">
+            <div class="card-icon green"><i class="bi bi-graph-up-arrow"></i></div>
+            <div>
+              <div class="card-title-neo">Step 4 — Prediksi</div>
+              <div class="card-subtitle-neo">Masukkan tahun target</div>
+            </div>
+          </div>
+
+          <label class="form-label-neo">Tahun Prediksi (pisahkan koma)</label>
+          <input type="text" class="form-control-neo" id="inputTahun" value="2026,2027,2028,2029,2030" placeholder="2026,2027,2028">
+
+          <div class="mt-3">
+            <button class="btn-neo-secondary" id="btnPredict">
+              <i class="bi bi-magic"></i> Prediksi Sekarang
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="col-lg-8">
+
+        <!-- DATA PREVIEW -->
+        <div class="card-neo reveal mb-4" id="panelDataPreview" style="display:none">
+          <div class="card-header-neo">
+            <div class="card-icon cyan"><i class="bi bi-table"></i></div>
+            <div>
+              <div class="card-title-neo">Preview Dataset</div>
+              <div class="card-subtitle-neo">Kepadatan Penduduk Jawa Barat</div>
+            </div>
+          </div>
+          <div class="data-preview" id="dataPreviewTable"></div>
+        </div>
+
+        <!-- CHART AKTUAL -->
+        <div class="card-neo reveal mb-4" id="panelChartActual" style="display:none">
+          <div class="card-header-neo">
+            <div class="card-icon purple"><i class="bi bi-bar-chart-fill"></i></div>
+            <div>
+              <div class="card-title-neo">Data Aktual — <span id="chartKabTitle" style="color:var(--accent)">—</span></div>
+              <div class="card-subtitle-neo">Kepadatan jiwa/km²</div>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chartActual"></canvas></div>
+        </div>
+
+        <!-- TRAINING METRICS -->
+        <div class="card-neo reveal mb-4" id="panelMetrics" style="display:none">
+          <div class="card-header-neo">
+            <div class="card-icon amber"><i class="bi bi-activity"></i></div>
+            <div>
+              <div class="card-title-neo">Evaluasi Model</div>
+              <div class="card-subtitle-neo">Training loss & metrics</div>
+            </div>
+          </div>
+          <div class="row g-3 mb-4">
+            <div class="col-4">
+              <div class="metric-box">
+                <div class="metric-val" id="metricMAE">—</div>
+                <div class="metric-lbl">MAE Score</div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="metric-box">
+                <div class="metric-val" style="color:var(--accent2)" id="metricEpoch">200</div>
+                <div class="metric-lbl">Epochs</div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="metric-box">
+                <div class="metric-val" style="color:var(--success)" id="metricLayers">3</div>
+                <div class="metric-lbl">ANN Layers</div>
+              </div>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height:200px"><canvas id="chartLoss"></canvas></div>
+        </div>
+
+        <!-- PREDIKSI HASIL -->
+        <div class="card-neo reveal mb-4" id="panelResults" style="display:none">
+          <div class="card-header-neo">
+            <div class="card-icon green"><i class="bi bi-stars"></i></div>
+            <div>
+              <div class="card-title-neo">Hasil Prediksi ANN</div>
+              <div class="card-subtitle-neo" id="resultSubtitle">—</div>
+            </div>
+          </div>
+
+          <!-- Chart Prediksi vs Aktual -->
+          <div class="chart-wrap mb-4"><canvas id="chartPred"></canvas></div>
+
+          <!-- Tabel Prediksi -->
+          <div class="section-tag"><i class="bi bi-table"></i> Tabel Prediksi</div>
+          <div class="table-responsive">
+            <table class="pred-table">
+              <thead>
+                <tr>
+                  <th>Tahun</th>
+                  <th>Prediksi Kepadatan</th>
+                  <th>Satuan</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="predTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TUTORIAL CODE -->
+        <div class="card-neo reveal" id="panelTutorial">
+          <div class="card-header-neo">
+            <div class="card-icon cyan"><i class="bi bi-code-slash"></i></div>
+            <div>
+              <div class="card-title-neo">Tutorial Kode Python</div>
+              <div class="card-subtitle-neo">Sesuai Modul BAB 4 — ANN</div>
+            </div>
+          </div>
+
+          <!-- Step-by-step tutorial -->
+          <div class="tutorial-collapse mb-2">
+            <button class="tutorial-toggle" onclick="toggleTut(this)">
+              <span><i class="bi bi-1-circle-fill" style="color:var(--accent)"></i> &nbsp;Instalasi Library</span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="tutorial-body">
+              <div class="code-block"><span class="cm"># Buka terminal, aktifkan venv, lalu install:</span>
+pip install numpy pandas matplotlib seaborn tensorflow keras scikit-learn flask</div>
+            </div>
+          </div>
+
+          <div class="tutorial-collapse mb-2">
+            <button class="tutorial-toggle" onclick="toggleTut(this)">
+              <span><i class="bi bi-2-circle-fill" style="color:var(--accent2)"></i> &nbsp;Import Library</span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="tutorial-body">
+              <div class="code-block"><span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+<span class="kw">import</span> seaborn <span class="kw">as</span> sns
+<span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> train_test_split
+<span class="kw">from</span> sklearn.preprocessing <span class="kw">import</span> MinMaxScaler
+<span class="kw">import</span> tensorflow <span class="kw">as</span> tf
+<span class="kw">from</span> tensorflow.keras.models <span class="kw">import</span> Sequential
+<span class="kw">from</span> tensorflow.keras.layers <span class="kw">import</span> Dense</div>
+            </div>
+          </div>
+
+          <div class="tutorial-collapse mb-2">
+            <button class="tutorial-toggle" onclick="toggleTut(this)">
+              <span><i class="bi bi-3-circle-fill" style="color:var(--accent3)"></i> &nbsp;Load Dataset CSV</span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="tutorial-body">
+              <div class="code-block"><span class="cm"># Baca dataset dari file CSV OpenData Jabar</span>
+df = pd.<span class="fn">read_csv</span>(<span class="str">"Kepadatan_penduduk_jabar.csv"</span>)
+
+<span class="cm"># Filter berdasarkan kabupaten tertentu</span>
+df_kab = df[df[<span class="str">"nama_kabupaten_kota"</span>] == <span class="str">"KOTA BANDUNG"</span>]
+df_kab = df_kab.<span class="fn">sort_values</span>(<span class="str">"tahun"</span>)
+
+<span class="cm"># Tampilkan 5 data pertama</span>
+<span class="fn">print</span>(df_kab.<span class="fn">head</span>())</div>
+            </div>
+          </div>
+
+          <div class="tutorial-collapse mb-2">
+            <button class="tutorial-toggle" onclick="toggleTut(this)">
+              <span><i class="bi bi-4-circle-fill" style="color:var(--success)"></i> &nbsp;Preprocessing & Normalisasi</span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="tutorial-body">
+              <div class="code-block"><span class="cm"># Normalisasi dengan MinMaxScaler</span>
+scaler_X = <span class="fn">MinMaxScaler</span>()
+scaler_y = <span class="fn">MinMaxScaler</span>()
+
+X = df_kab[[<span class="str">"tahun"</span>]].values
+y = df_kab[[<span class="str">"kepadatan_penduduk"</span>]].values
+
+X_scaled = scaler_X.<span class="fn">fit_transform</span>(X)
+y_scaled = scaler_y.<span class="fn">fit_transform</span>(y)
+
+<span class="cm"># Split 80% train, 20% test</span>
+X_train, X_test, y_train, y_test = <span class="fn">train_test_split</span>(
+    X_scaled, y_scaled, test_size=<span class="num">0.2</span>, random_state=<span class="num">42</span>
+)</div>
+            </div>
+          </div>
+
+          <div class="tutorial-collapse mb-2">
+            <button class="tutorial-toggle" onclick="toggleTut(this)">
+              <span><i class="bi bi-5-circle-fill" style="color:#f472b6"></i> &nbsp;Bangun & Train Model ANN</span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="tutorial-body">
+              <div class="code-block"><span class="cm"># Membangun model ANN</span>
+model = <span class="fn">Sequential</span>([
+    <span class="fn">Dense</span>(<span class="num">10</span>, activation=<span class="str">'relu'</span>, input_shape=(<span class="num">1</span>,)),  <span class="cm"># Hidden 1</span>
+    <span class="fn">Dense</span>(<span class="num">10</span>, activation=<span class="str">'relu'</span>),                    <span class="cm"># Hidden 2</span>
+    <span class="fn">Dense</span>(<span class="num">1</span>, activation=<span class="str">'linear'</span>)                    <span class="cm"># Output</span>
+])
+
+<span class="cm"># Kompilasi model</span>
+model.<span class="fn">compile</span>(optimizer=<span class="str">'adam'</span>, loss=<span class="str">'mse'</span>, metrics=[<span class="str">'mae'</span>])
+
+<span class="cm"># Training 200 epoch</span>
+history = model.<span class="fn">fit</span>(X_train, y_train, epochs=<span class="num">200</span>,
+    validation_data=(X_test, y_test), verbose=<span class="num">1</span>)
+
+<span class="cm"># Evaluasi</span>
+loss, mae = model.<span class="fn">evaluate</span>(X_test, y_test)
+<span class="fn">print</span>(<span class="str">f"MAE: {mae:.4f}"</span>)</div>
+            </div>
+          </div>
+
+          <div class="tutorial-collapse mb-2">
+            <button class="tutorial-toggle" onclick="toggleTut(this)">
+              <span><i class="bi bi-6-circle-fill" style="color:var(--accent)"></i> &nbsp;Prediksi Tahun Mendatang</span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="tutorial-body">
+              <div class="code-block"><span class="cm"># Prediksi tahun 2026 - 2030</span>
+tahun_pred = np.<span class="fn">array</span>([[<span class="num">2026</span>],[<span class="num">2027</span>],[<span class="num">2028</span>],[<span class="num">2029</span>],[<span class="num">2030</span>]])
+tahun_scaled = scaler_X.<span class="fn">transform</span>(tahun_pred)
+
+pred_scaled = model.<span class="fn">predict</span>(tahun_scaled)
+pred = scaler_y.<span class="fn">inverse_transform</span>(pred_scaled)
+
+<span class="kw">for</span> tahun, kepadatan <span class="kw">in</span> <span class="fn">zip</span>([<span class="num">2026</span>,<span class="num">2027</span>,<span class="num">2028</span>,<span class="num">2029</span>,<span class="num">2030</span>], pred):
+    <span class="fn">print</span>(<span class="str">f"Tahun {tahun}: {int(kepadatan[0])} jiwa/km²"</span>)</div>
+            </div>
+          </div>
+
+        </div><!-- end tutorial -->
+
+      </div><!-- end col -->
+    </div><!-- end row -->
+  </div>
+</main>
+
+<!-- FOOTER -->
+<footer class="footer-neo">
+  <div class="container">
+    Dibuat dengan <span>♥</span> menggunakan <span>Flask</span> + <span>TensorFlow/Keras</span> + <span>Bootstrap 5</span>
+    &nbsp;|&nbsp; Data: <span>OpenData Jawa Barat</span>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ===== STATE =====
+let chartActual = null;
+let chartLoss = null;
+let chartPred = null;
+let currentKab = '';
+let dataLoaded = false;
+let modelTrained = false;
+let globalData = [];
+
+// ===== SCROLL REVEAL =====
+const revealEls = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('visible'), i * 80);
+    }
+  });
+}, { threshold: 0.1 });
+revealEls.forEach(el => observer.observe(el));
+
+// Auto-trigger all reveals
+setTimeout(() => revealEls.forEach(el => el.classList.add('visible')), 100);
+
+// ===== TUTORIAL TOGGLE =====
+function toggleTut(btn) {
+  const body = btn.nextElementSibling;
+  const icon = btn.querySelector('.bi-chevron-down, .bi-chevron-up');
+  body.classList.toggle('open');
+  if (icon) {
+    icon.className = body.classList.contains('open')
+      ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+  }
+}
+
+// ===== STEP CONTROL =====
+function setStep(n) {
+  for (let i = 1; i <= 5; i++) {
+    const s = document.getElementById('step' + i);
+    const c = document.getElementById('conn' + i);
+    if (i < n) {
+      s.className = 'step-item done';
+      if (c) c.className = 'step-connector done';
+    } else if (i === n) {
+      s.className = 'step-item active';
+    } else {
+      s.className = 'step-item';
+      if (c) c.className = 'step-connector';
+    }
+  }
+}
+
+function enablePanel(id) {
+  const el = document.getElementById(id);
+  if (el) { el.style.opacity = '1'; el.style.pointerEvents = 'auto'; }
+}
+
+// ===== STATUS MESSAGES =====
+function showStatus(id, type, msg) {
+  document.getElementById(id).innerHTML =
+    `<div class="alert-neo ${type}"><i class="bi bi-${type==='success'?'check-circle-fill':type==='error'?'exclamation-triangle-fill':'info-circle-fill'}"></i>${msg}</div>`;
+}
+
+function showLoading(btnId, text) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = true;
+  btn.innerHTML = `<span class="loader-spin"></span> ${text}`;
+}
+
+function resetBtn(btnId, icon, text) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = false;
+  btn.innerHTML = `<i class="bi bi-${icon}"></i> ${text}`;
+}
+
+// ===== CHART HELPER =====
+const chartDefaults = {
+  color: '#5a7a9a',
+  font: { family: "'Space Mono', monospace", size: 11 }
+};
+
+function makeLineChart(canvasId, labels, datasets) {
+  const canvas = document.getElementById(canvasId);
+  const existing = Chart.getChart(canvas);
+  if (existing) existing.destroy();
+
+  return new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#e2eaf5', font: chartDefaults.font, boxWidth: 12 }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: chartDefaults.color, font: chartDefaults.font },
+          grid: { color: 'rgba(30,45,66,0.6)' }
+        },
+        y: {
+          ticks: { color: chartDefaults.color, font: chartDefaults.font },
+          grid: { color: 'rgba(30,45,66,0.6)' }
+        }
+      }
+    }
+  });
+}
+
+// ===== LOAD DATASET =====
+document.getElementById('btnLoad').addEventListener('click', async () => {
+  showLoading('btnLoad', 'Memuat data...');
+  const formData = new FormData();
+  const fileInput = document.getElementById('fileInput');
+  if (fileInput.files[0]) formData.append('file', fileInput.files[0]);
+
+  try {
+    const res = await fetch('/load_data', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      const s = data.stats;
+      document.getElementById('statKabupaten').textContent = s.total_kabupaten;
+      document.getElementById('statTahun').textContent = s.tahun_range;
+      document.getElementById('statRows').textContent = s.total_rows;
+
+      // Populate select
+      const sel = document.getElementById('selectKabupaten');
+      sel.innerHTML = '<option value="">-- Pilih Daerah --</option>';
+      s.kabupaten_list.forEach(k => {
+        sel.innerHTML += `<option value="${k}">${k}</option>`;
+      });
+
+      // Build data preview table
+      buildPreviewTable(s.kabupaten_list);
+
+      showStatus('uploadStatus', 'success', `Dataset berhasil dimuat! ${s.total_rows} baris data`);
+      enablePanel('panelSelect');
+      enablePanel('panelTrain');
+      document.getElementById('panelDataPreview').style.display = 'block';
+      dataLoaded = true;
+      setStep(2);
+    } else {
+      showStatus('uploadStatus', 'error', data.message);
+    }
+  } catch (e) {
+    showStatus('uploadStatus', 'error', 'Gagal memuat data: ' + e.message);
+  }
+  resetBtn('btnLoad', 'lightning-fill', 'Load Dataset');
+});
+
+function buildPreviewTable(kabList) {
+  let html = '<table><thead><tr><th>#</th><th>Kabupaten/Kota</th></tr></thead><tbody>';
+  kabList.slice(0, 30).forEach((k, i) => {
+    html += `<tr><td>${i+1}</td><td>${k}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('dataPreviewTable').innerHTML = html;
+}
+
+// File input label
+document.getElementById('fileInput').addEventListener('change', function() {
+  if (this.files[0]) {
+    document.querySelector('.upload-text').innerHTML =
+      `<strong>${this.files[0].name}</strong><br><span style="color:var(--success)">File siap diupload</span>`;
+  }
+});
+
+// Select change
+document.getElementById('selectKabupaten').addEventListener('change', function() {
+  currentKab = this.value;
+  if (currentKab) setStep(3);
+});
+
+// ===== TRAIN MODEL =====
+document.getElementById('btnTrain').addEventListener('click', async () => {
+  currentKab = document.getElementById('selectKabupaten').value;
+  if (!currentKab) {
+    showStatus('trainStatus', 'warning', 'Pilih kabupaten/kota terlebih dahulu!');
+    return;
+  }
+
+  showLoading('btnTrain', 'Training 200 epochs...');
+  showStatus('trainStatus', 'info', 'Sedang melatih model ANN, mohon tunggu...');
+
+  try {
+    const res = await fetch('/train', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kabupaten: currentKab })
+    });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      // Update metric
+      document.getElementById('metricMAE').textContent = data.mae.toFixed(4);
+      document.getElementById('chartKabTitle').textContent = currentKab;
+
+      // Chart Aktual
+      document.getElementById('panelChartActual').style.display = 'block';
+      const labels = data.actual_data.map(d => d.tahun);
+      const vals = data.actual_data.map(d => d.kepadatan);
+      globalData = data.actual_data;
+
+      chartActual = makeLineChart('chartActual', labels, [{
+        label: 'Kepadatan Aktual',
+        data: vals,
+        borderColor: '#00e5ff',
+        backgroundColor: 'rgba(0,229,255,0.08)',
+        pointBackgroundColor: '#00e5ff',
+        pointRadius: 5,
+        tension: 0.4,
+        fill: true
+      }]);
+
+      // Chart Loss
+      document.getElementById('panelMetrics').style.display = 'block';
+      const lossLabels = data.epochs_sample.map(e => 'Ep ' + e);
+      chartLoss = makeLineChart('chartLoss', lossLabels, [{
+        label: 'Training Loss (MSE)',
+        data: data.loss_history,
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.05)',
+        pointRadius: 0,
+        tension: 0.4,
+        fill: true
+      }]);
+
+      enablePanel('panelPredict');
+      modelTrained = true;
+      showStatus('trainStatus', 'success', `✅ Training selesai! MAE: ${data.mae.toFixed(4)}`);
+      setStep(4);
+    } else {
+      showStatus('trainStatus', 'error', data.message);
+    }
+  } catch(e) {
+    showStatus('trainStatus', 'error', 'Error: ' + e.message);
+  }
+  resetBtn('btnTrain', 'play-fill', 'Mulai Training');
+});
+
+// ===== PREDICT =====
+document.getElementById('btnPredict').addEventListener('click', async () => {
+  if (!modelTrained) {
+    alert('Latih model terlebih dahulu!');
+    return;
+  }
+
+  const raw = document.getElementById('inputTahun').value;
+  const tahunList = raw.split(',').map(t => parseInt(t.trim())).filter(t => !isNaN(t));
+
+  if (tahunList.length === 0) {
+    alert('Masukkan tahun yang valid!');
+    return;
+  }
+
+  const origBtn = document.getElementById('btnPredict');
+  origBtn.disabled = true;
+  origBtn.innerHTML = '<span class="loader-spin"></span> Prediksi...';
+
+  try {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kabupaten: currentKab, tahun_list: tahunList })
+    });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      // Combined chart
+      document.getElementById('panelResults').style.display = 'block';
+      document.getElementById('resultSubtitle').textContent = currentKab;
+
+      const actualLabels = globalData.map(d => d.tahun);
+      const actualVals = globalData.map(d => d.kepadatan);
+      const overlayLabels = data.overlay.map(d => d.tahun);
+      const overlayVals = data.overlay.map(d => d.prediksi);
+      const predLabels = data.predictions.map(d => d.tahun);
+      const predVals = data.predictions.map(d => d.prediksi);
+
+      const allLabels = [...new Set([...actualLabels, ...predLabels])].sort();
+
+      const canvas = document.getElementById('chartPred');
+      const existing = Chart.getChart(canvas);
+      if (existing) existing.destroy();
+
+      new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: allLabels,
+          datasets: [
+            {
+              label: 'Data Aktual',
+              data: allLabels.map(l => {
+                const found = globalData.find(d => d.tahun === l);
+                return found ? found.kepadatan : null;
+              }),
+              borderColor: '#00e5ff',
+              backgroundColor: 'rgba(0,229,255,0.08)',
+              pointRadius: 5,
+              pointBackgroundColor: '#00e5ff',
+              tension: 0.4,
+              spanGaps: false,
+              fill: true
+            },
+            {
+              label: 'Prediksi ANN (historis)',
+              data: allLabels.map(l => {
+                const found = data.overlay.find(d => d.tahun === l);
+                return found ? found.prediksi : null;
+              }),
+              borderColor: '#7c3aed',
+              borderDash: [4,4],
+              pointRadius: 3,
+              pointBackgroundColor: '#7c3aed',
+              tension: 0.4,
+              spanGaps: false
+            },
+            {
+              label: 'Prediksi Masa Depan',
+              data: allLabels.map(l => {
+                const found = data.predictions.find(d => d.tahun === l);
+                return found ? found.prediksi : null;
+              }),
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245,158,11,0.08)',
+              pointRadius: 6,
+              pointBackgroundColor: '#f59e0b',
+              pointStyle: 'star',
+              tension: 0.4,
+              spanGaps: false,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#e2eaf5', font: { family: "'Space Mono',monospace", size: 11 }, boxWidth: 12 } }
+          },
+          scales: {
+            x: { ticks: { color: '#5a7a9a', font: { family: "'Space Mono',monospace", size: 10 } }, grid: { color: 'rgba(30,45,66,0.6)' } },
+            y: { ticks: { color: '#5a7a9a', font: { family: "'Space Mono',monospace", size: 10 } }, grid: { color: 'rgba(30,45,66,0.6)' } }
+          }
+        }
+      });
+
+      // Tabel hasil
+      let tbHtml = '';
+      data.predictions.forEach(p => {
+        const prevActual = globalData.length > 0 ? globalData[globalData.length-1].kepadatan : p.prediksi;
+        const trend = p.prediksi > prevActual ? '↑ Naik' : '↓ Turun';
+        const trendColor = p.prediksi > prevActual ? 'var(--success)' : 'var(--danger)';
+        tbHtml += `<tr>
+          <td>${p.tahun}</td>
+          <td><strong>${p.prediksi.toLocaleString('id-ID')}</strong></td>
+          <td style="color:var(--text-muted)">Jiwa/km²</td>
+          <td style="color:${trendColor};font-weight:700">${trend}</td>
+        </tr>`;
+      });
+      document.getElementById('predTableBody').innerHTML = tbHtml;
+
+      setStep(5);
+    }
+  } catch(e) {
+    console.error(e);
+  }
+
+  origBtn.disabled = false;
+  origBtn.innerHTML = '<i class="bi bi-magic"></i> Prediksi Sekarang';
+});
+
+// ===== AUTO LOAD DEFAULT =====
+window.addEventListener('DOMContentLoaded', () => {
+  // Auto-load default dataset
+  setTimeout(() => {
+    document.getElementById('btnLoad').click();
+  }, 600);
+});
+</script>
+</body>
+</html>

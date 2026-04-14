@@ -2,15 +2,22 @@ from flask import Flask, render_template, request, jsonify
 import numpy as np
 import pandas as pd
 import os
-import json
+
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
+
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
+
 import warnings
 warnings.filterwarnings('ignore')
+
+# =========================
+# DEPLOY STABILITY FIX
+# =========================
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 app = Flask(__name__)
 
@@ -21,8 +28,12 @@ df_global = None
 kabupaten_list = []
 
 
+# =========================
+# TRAIN MODEL
+# =========================
 def load_and_train(df_filtered):
     global model_ann, scaler_X, scaler_y
+
     scaler_X = MinMaxScaler()
     scaler_y = MinMaxScaler()
 
@@ -41,59 +52,81 @@ def load_and_train(df_filtered):
         Dense(10, activation='relu'),
         Dense(1, activation='linear')
     ])
+
     model.compile(optimizer='adam', loss='mse', metrics=['mae'])
-    history = model.fit(X_train, y_train, epochs=200,
-                        validation_data=(X_test, y_test), verbose=0)
+
+    history = model.fit(
+        X_train, y_train,
+        epochs=50,
+        validation_data=(X_test, y_test),
+        verbose=0
+    )
 
     loss, mae = model.evaluate(X_test, y_test, verbose=0)
+
     model_ann = model
-    return model, history, mae, X_test, y_test
+
+    return model, history, mae
 
 
+# =========================
+# HOME
+# =========================
 @app.route('/')
 def index():
     return render_template('index.html', kabupaten_list=kabupaten_list)
 
 
+# =========================
+# LOAD DATA
+# =========================
 @app.route('/load_data', methods=['POST'])
 def load_data():
     global df_global, kabupaten_list
 
-    if 'file' in request.files and request.files['file'].filename != '':
-        file = request.files['file']
-        df = pd.read_csv(file)
-    else:
-        default_path = os.path.join(os.path.dirname(__file__), 'Kepadatan_penduduk_jabar.csv')
-        if os.path.exists(default_path):
-            df = pd.read_csv(default_path)
+    try:
+        if 'file' in request.files and request.files['file'].filename != '':
+            file = request.files['file']
+            df = pd.read_csv(file)
         else:
-            return jsonify({'status': 'error', 'message': 'File tidak ditemukan'})
+            path = os.path.join(os.path.dirname(__file__), 'Kepadatan_penduduk_jabar.csv')
+            if not os.path.exists(path):
+                return jsonify({'status': 'error', 'message': 'CSV tidak ditemukan'})
+            df = pd.read_csv(path)
 
-    df.columns = [c.lower().strip() for c in df.columns]
+        df.columns = [c.lower().strip() for c in df.columns]
 
-    required = ['nama_kabupaten_kota', 'kepadatan_penduduk', 'tahun']
-    for col in required:
-        if col not in df.columns:
-            return jsonify({'status': 'error', 'message': f'Kolom {col} tidak ditemukan'})
+        required = ['nama_kabupaten_kota', 'kepadatan_penduduk', 'tahun']
+        for c in required:
+            if c not in df.columns:
+                return jsonify({'status': 'error', 'message': f'Kolom {c} tidak ditemukan'})
 
-    df_global = df.copy()
-    kabupaten_list = sorted(df['nama_kabupaten_kota'].unique().tolist())
+        df_global = df.copy()
+        kabupaten_list = sorted(df['nama_kabupaten_kota'].unique().tolist())
 
-    stats = {
-        'total_rows': len(df),
-        'total_kabupaten': len(kabupaten_list),
-        'tahun_range': f"{int(df['tahun'].min())} - {int(df['tahun'].max())}",
-        'kabupaten_list': kabupaten_list
-    }
-    return jsonify({'status': 'success', 'stats': stats})
+        return jsonify({
+            'status': 'success',
+            'stats': {
+                'total_rows': len(df),
+                'total_kabupaten': len(kabupaten_list),
+                'tahun_range': f"{int(df['tahun'].min())} - {int(df['tahun'].max())}",
+                'kabupaten_list': kabupaten_list
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
 
 
+# =========================
+# TRAIN
+# =========================
 @app.route('/train', methods=['POST'])
 def train():
     global df_global
 
     if df_global is None:
-        return jsonify({'status': 'error', 'message': 'Upload data terlebih dahulu'})
+        return jsonify({'status': 'error', 'message': 'Upload data dulu'})
 
     data = request.json
     kabupaten = data.get('kabupaten', '')
@@ -102,25 +135,27 @@ def train():
     df_filtered = df_filtered.sort_values('tahun')
 
     if len(df_filtered) < 3:
-        return jsonify({'status': 'error', 'message': 'Data tidak cukup'})
+        return jsonify({'status': 'error', 'message': 'Data kurang'})
 
-    model, history, mae, X_test, y_test = load_and_train(df_filtered)
+    model, history, mae = load_and_train(df_filtered)
 
-    actual_data = []
-    for _, row in df_filtered.iterrows():
-        actual_data.append({'tahun': int(row['tahun']), 'kepadatan': float(row['kepadatan_penduduk'])})
-
-    loss_history = history.history['loss'][:200:2]
+    actual = [
+        {'tahun': int(r['tahun']), 'kepadatan': float(r['kepadatan_penduduk'])}
+        for _, r in df_filtered.iterrows()
+    ]
 
     return jsonify({
         'status': 'success',
         'mae': round(float(mae), 4),
-        'actual_data': actual_data,
-        'loss_history': [round(v, 6) for v in loss_history],
-        'epochs_sample': list(range(0, 200, 2))
+        'actual_data': actual,
+        'loss_history': [float(x) for x in history.history['loss'][::2]],
+        'epochs_sample': list(range(len(history.history['loss'][::2])))
     })
 
 
+# =========================
+# PREDICT
+# =========================
 @app.route('/predict', methods=['POST'])
 def predict():
     global model_ann, scaler_X, scaler_y, df_global
@@ -135,39 +170,48 @@ def predict():
     df_filtered = df_global[df_global['nama_kabupaten_kota'] == kabupaten].copy()
     df_filtered = df_filtered.sort_values('tahun')
 
-    tahun_arr = np.array(tahun_list).reshape(-1, 1)
-    tahun_scaled = scaler_X.transform(tahun_arr)
-    pred_scaled = model_ann.predict(tahun_scaled, verbose=0)
+    X_future = np.array(tahun_list).reshape(-1, 1)
+    X_future_scaled = scaler_X.transform(X_future)
+
+    pred_scaled = model_ann.predict(X_future_scaled, verbose=0)
     pred = scaler_y.inverse_transform(pred_scaled)
 
-    results = []
-    for t, p in zip(tahun_list, pred.flatten()):
-        results.append({'tahun': int(t), 'prediksi': round(float(p), 2)})
+    predictions = [
+        {'tahun': int(t), 'prediksi': round(float(p), 2)}
+        for t, p in zip(tahun_list, pred.flatten())
+    ]
 
-    all_tahun = df_filtered['tahun'].values.reshape(-1, 1)
-    all_scaled = scaler_X.transform(all_tahun)
-    all_pred_scaled = model_ann.predict(all_scaled, verbose=0)
-    all_pred = scaler_y.inverse_transform(all_pred_scaled).flatten()
+    X_all = df_filtered['tahun'].values.reshape(-1, 1)
+    X_all_scaled = scaler_X.transform(X_all)
+    pred_all = model_ann.predict(X_all_scaled, verbose=0)
+    pred_all = scaler_y.inverse_transform(pred_all).flatten()
 
-    overlay = []
-    for t, p in zip(df_filtered['tahun'].values, all_pred):
-        overlay.append({'tahun': int(t), 'prediksi': round(float(p), 2)})
+    overlay = [
+        {'tahun': int(t), 'prediksi': round(float(p), 2)}
+        for t, p in zip(df_filtered['tahun'].values, pred_all)
+    ]
 
     return jsonify({
         'status': 'success',
-        'predictions': results,
+        'predictions': predictions,
         'overlay': overlay
     })
 
 
-if __name__ == '__main__':
-    default_path = os.path.join(os.path.dirname(__file__), 'Kepadatan_penduduk_jabar.csv')
-    if os.path.exists(default_path):
-        df = pd.read_csv(default_path)
-        df.columns = [c.lower().strip() for c in df.columns]
-        df_global = df.copy()
-        kabupaten_list = sorted(df['nama_kabupaten_kota'].unique().tolist())
-        print(f"✅ Data loaded: {len(kabupaten_list)} kabupaten/kota")
+# =========================
+# MAIN (FIX DEPLOY RAILWAY)
+# =========================
+if __name__ == "__main__":
+    try:
+        path = os.path.join(os.path.dirname(__file__), 'Kepadatan_penduduk_jabar.csv')
+        if os.path.exists(path):
+            df = pd.read_csv(path)
+            df.columns = [c.lower().strip() for c in df.columns]
+            df_global = df.copy()
+            kabupaten_list = sorted(df['nama_kabupaten_kota'].unique().tolist())
+            print(f"✅ Data loaded: {len(kabupaten_list)} kabupaten/kota")
+    except Exception as e:
+        print("⚠️ Error:", e)
 
-    app.run(debug=True, port=5000)
-    
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

@@ -6,3 +6,4 @@ tensorflow==2.13.0
 Werkzeug==2.2.3
 setuptools
 wheel
+gunicorn==21.2.0
